@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,15 @@ export default function Home() {
     const removeFile = (index: number) => {
         setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
+
+    useEffect(() => {
+        if (result) {
+            const element = document.getElementById('result-card');
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [result]);
 
     const startJob = async () => {
         if (selectedFiles.length === 0) {
@@ -107,10 +116,7 @@ export default function Home() {
         if (!result) return;
 
         try {
-            // 1. Fetch the file to ensure we have it before deleting
             const { data: blob } = await axios.get(result.pdfUrl, { responseType: 'blob' });
-
-            // 2. Trigger browser download
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -120,11 +126,10 @@ export default function Home() {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
 
-            // 3. Request cleanup from server
             await axios.post('/api/cleanup-pdf', { url: result.pdfUrl });
 
             toast.info("O PDF foi removido do servidor por segurança.");
-            setResult(null); // Clear result as it's no longer available
+            setResult(null);
             setStatus(Status.START);
             setSelectedFiles([]);
         } catch (error) {
@@ -220,7 +225,7 @@ export default function Home() {
                 )}
 
                 {result && (
-                    <Card className="bg-emerald-900/20 border-emerald-500/50 animate-in zoom-in-95 duration-500">
+                    <Card className="bg-emerald-900/20 border-emerald-500/50 animate-in zoom-in-95 duration-500" id='result-card'>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <div className="space-y-1">
                                 <CardTitle className="text-emerald-400 flex items-center gap-2">
