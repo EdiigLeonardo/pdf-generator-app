@@ -210,9 +210,7 @@ export class StorageService {
         const files = await this.listFiles(prefix);
         if (files.length === 0) return;
 
-        console.log(`Deleting ${files.length} files...`);
         await Promise.all(files.map(file => this.deleteFile(file)));
-        console.log('Successfully cleared the bucket.');
     }
 }
 

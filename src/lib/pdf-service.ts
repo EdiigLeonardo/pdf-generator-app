@@ -26,10 +26,6 @@ async function optimizeImage(buffer: Buffer): Promise<Buffer> {
         .toBuffer();
 }
 
-/**
- * Extracts the filename from a Supabase storage URL.
- * Example: https://olmuwydjqvknnbjqdnak.supabase.co/storage/v1/object/public/poc-digestaid/img-1772118011209.png
- */
 function getFileNameFromUrl(url: string): string | null {
     try {
         const parts = url.split('/');
@@ -47,7 +43,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
         const optimizedImageBase64s: string[] = [];
 
         if (imageBuffers && imageBuffers.length > 0) {
-            console.log(`[generatePdf] Optimizing ${imageBuffers.length} provided buffers...`);
             const optimizedBuffers = await Promise.all(
                 imageBuffers.map(buffer => optimizeImage(buffer))
             );
@@ -55,7 +50,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
         }
 
         if (imageUrls && imageUrls.length > 0) {
-            console.log(`[generatePdf] Processing ${imageUrls.length} image URLs...`);
             const fetchedAndOptimized = await Promise.all(
                 imageUrls.map(async (url) => {
                     try {
@@ -63,10 +57,8 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
 
                         const fileName = getFileNameFromUrl(url);
                         if (fileName && fileName.startsWith('img-')) {
-                            console.log(`[generatePdf] Reading ${fileName} directly from storage...`);
                             buffer = await storageService.readFile(fileName);
                         } else {
-                            console.log(`[generatePdf] Fetching ${url} via HTTP...`);
                             const { data: arrayBuffer } = await axios.get(url, { responseType: 'arraybuffer' });
                             buffer = Buffer.from(arrayBuffer);
                         }
@@ -86,8 +78,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
             throw new Error('Could not process any images for the PDF. Check if the images were uploaded correctly.');
         }
 
-        console.log(`[generatePdf] Total optimized images for HTML: ${optimizedImageBase64s.length}`);
-
         const imagesHtml = optimizedImageBase64s
             .map(base64 => `
                 <div style="width: 100%; display: flex; justify-content: space-between; gap: 20px;">
@@ -98,7 +88,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
 
         let browser;
 
-        console.log(`[generatePdf] Launching browser (Mode: ${process.env.NODE_ENV})...`);
         if (process.env.NODE_ENV === 'production' || process.env.VERCEL || process.env.NETLIFY) {
             const executablePath = await chromium.executablePath(
                 'https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar'
@@ -118,7 +107,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
         }
 
         const page = await browser.newPage();
-        console.log(`[generatePdf] Page opened, setting content...`);
 
         const htmlContent = `
       <html>
@@ -156,7 +144,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
     `;
 
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        console.log(`[generatePdf] Rendering PDF buffer...`);
 
         const pdfBuffer = await page.pdf({
             format: 'A4',
