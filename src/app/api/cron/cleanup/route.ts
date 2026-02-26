@@ -11,34 +11,13 @@ export async function GET(req: Request) {
     }
 
     try {
-        console.log('[CRON] Starting cleanup...');
+        console.log('[CRON] Starting full bucket cleanup...');
 
-        // List all files with 'img-' prefix
-        const files = await storageService.listFiles('img-');
-        console.log(`[CRON] Found ${files.length} images to clean up.`);
-
-        let deletedCount = 0;
-        let errorCount = 0;
-
-        await Promise.all(
-            files.map(async (fileName) => {
-                try {
-                    await storageService.deleteFile(fileName);
-                    deletedCount++;
-                } catch (err) {
-                    console.error(`[CRON] Failed to delete ${fileName}:`, err);
-                    errorCount++;
-                }
-            })
-        );
-
-        console.log(`[CRON] Cleanup finished. Deleted: ${deletedCount}, Errors: ${errorCount}`);
+        await storageService.deleteAllFiles();
 
         return NextResponse.json({
             success: true,
-            deletedCount,
-            errorCount,
-            message: 'Daily cleanup completed successfully'
+            message: 'Bucket cleanup completed successfully'
         });
     } catch (error) {
         console.error('[CRON] Cleanup error:', error);

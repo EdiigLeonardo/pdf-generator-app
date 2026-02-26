@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         return NextResponse.json(result);
     } catch (error) {
         console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error during PDF generation';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

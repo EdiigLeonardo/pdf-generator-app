@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
-    "cleanup-bucket": "ts-node src/scripts/cleanup-bucket.ts"
+    "postbuild": "npm run cleanup-bucket",
+    "cleanup-bucket": "npx tsx src/scripts/cleanup-bucket.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.998.0",

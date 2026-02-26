@@ -5,7 +5,7 @@ describe('PDF Generation E2E Test', () => {
     // E2E tests can take a while, especially with 500 images
     jest.setTimeout(300000); // 5 minutes
 
-    const API_URL = 'http://localhost:3000/api/jobs';
+    const API_URL = '/api/jobs';
 
     it('should generate a PDF from 500 uploaded images and measure execution time', async () => {
         console.log('Starting E2E test with 500 images...');
