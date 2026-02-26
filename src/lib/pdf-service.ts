@@ -4,6 +4,7 @@ import chromium from '@sparticuz/chromium';
 import { storageService } from './cloud-storage-service';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -43,10 +44,8 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
     const startTime = Date.now();
 
     try {
-        // Optimize all images in parallel
         const optimizedImageBase64s: string[] = [];
 
-        // 1. Process provided buffers (direct from API/Tests)
         if (imageBuffers && imageBuffers.length > 0) {
             console.log(`[generatePdf] Optimizing ${imageBuffers.length} provided buffers...`);
             const optimizedBuffers = await Promise.all(
@@ -55,7 +54,6 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
             optimizedImageBase64s.push(...optimizedBuffers.map(b => b.toString('base64')));
         }
 
-        // 2. Process image URLs (Production mode)
         if (imageUrls && imageUrls.length > 0) {
             console.log(`[generatePdf] Processing ${imageUrls.length} image URLs...`);
             const fetchedAndOptimized = await Promise.all(
@@ -63,17 +61,13 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
                     try {
                         let buffer: Buffer;
 
-                        // Priority: Read directly from our storage instead of public HTTP fetch
-                        // This bypasses CORS and permission issues in private buckets
                         const fileName = getFileNameFromUrl(url);
                         if (fileName && fileName.startsWith('img-')) {
                             console.log(`[generatePdf] Reading ${fileName} directly from storage...`);
                             buffer = await storageService.readFile(fileName);
                         } else {
                             console.log(`[generatePdf] Fetching ${url} via HTTP...`);
-                            const response = await fetch(url);
-                            if (!response.ok) throw new Error(`HTTP Error ${response.status} fetching ${url}`);
-                            const arrayBuffer = await response.arrayBuffer();
+                            const { data: arrayBuffer } = await axios.get(url, { responseType: 'arraybuffer' });
                             buffer = Buffer.from(arrayBuffer);
                         }
 
@@ -96,8 +90,8 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
 
         const imagesHtml = optimizedImageBase64s
             .map(base64 => `
-                <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 20px;">
-                    <img src="data:image/jpeg;base64,${base64}" alt="Imagem do relatório" style="width: 70%; height: auto; border: 1px solid #ddd;"/>
+                <div style="width: 100%; display: flex; justify-content: space-between; gap: 20px;">
+                    <img src="data:image/jpeg;base64,${base64}" alt="Imagem do relatório" style="width: 49%; height: auto; border: 1px solid #ddd;"/>
                 </div>
             `)
             .join('');

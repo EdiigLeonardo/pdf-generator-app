@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import axios from 'axios';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,23 +53,17 @@ export default function Home() {
             const imageUrls = await Promise.all(
                 selectedFiles.map(async (file, index) => {
                     const fileName = `img-${Date.now()}-${index}-${file.name.replace(/\s+/g, '_')}`;
-                    const urlRes = await fetch('/api/upload-url', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileName, contentType: file.type })
+
+                    const { data: urlData } = await axios.post('/api/upload-url', {
+                        fileName,
+                        contentType: file.type
                     });
 
-                    if (!urlRes.ok) throw new Error(`Erro ao obter URL de upload para ${file.name}`);
+                    const { uploadUrl, publicUrl } = urlData;
 
-                    const { uploadUrl, publicUrl } = await urlRes.json();
-
-                    const uploadRes = await fetch(uploadUrl, {
-                        method: 'PUT',
-                        body: file,
+                    await axios.put(uploadUrl, file, {
                         headers: { 'Content-Type': file.type }
                     });
-
-                    if (!uploadRes.ok) throw new Error(`Erro ao carregar ${file.name}`);
 
                     completedChunks++;
                     setProgress(Math.round((completedChunks / totalChunks) * 100));
@@ -79,30 +74,26 @@ export default function Home() {
 
             setStatus(Status.PROCESSING);
 
-            const res = await fetch('/api/jobs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageUrls }),
-            });
-            const data = await res.json();
+            const { data: jobData } = await axios.post('/api/jobs', { imageUrls });
 
-            if (res.ok) {
-                setProgress(100);
-                setResult(data);
-                setStatus(Status.SUCCESS);
-                toast.success("PDF gerado com sucesso.");
-            } else {
-                setStatus(Status.ERROR);
-                toast.error(data.error || "Erro ao gerar PDF.");
-            }
+            setProgress(100);
+            setResult(jobData);
+            setStatus(Status.SUCCESS);
+            toast.success("PDF gerado com sucesso.");
         } catch (error) {
             console.error('[startJob] error', error);
             setStatus(Status.ERROR);
-            const message = error instanceof Error ? error.message : "Não foi possível processar o pedido.";
+
+            let message = "Não foi possível processar o pedido.";
+            if (axios.isAxiosError(error) && error.response?.data?.error) {
+                message = error.response.data.error;
+            } else if (error instanceof Error) {
+                message = error.message;
+            }
+
             toast.error(message);
 
-            // Emergency cleanup: delete all images if the flow failed
-            fetch('/api/emergency-cleanup', { method: 'POST' }).catch(err =>
+            axios.post('/api/emergency-cleanup').catch(err =>
                 console.error('Failed to trigger emergency cleanup:', err)
             );
         } finally {
@@ -117,8 +108,7 @@ export default function Home() {
 
         try {
             // 1. Fetch the file to ensure we have it before deleting
-            const response = await fetch(result.pdfUrl);
-            const blob = await response.blob();
+            const { data: blob } = await axios.get(result.pdfUrl, { responseType: 'blob' });
 
             // 2. Trigger browser download
             const url = window.URL.createObjectURL(blob);
@@ -131,11 +121,7 @@ export default function Home() {
             window.URL.revokeObjectURL(url);
 
             // 3. Request cleanup from server
-            await fetch('/api/cleanup-pdf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: result.pdfUrl })
-            });
+            await axios.post('/api/cleanup-pdf', { url: result.pdfUrl });
 
             toast.info("O PDF foi removido do servidor por segurança.");
             setResult(null); // Clear result as it's no longer available

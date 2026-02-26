@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 describe('PDF Generation E2E Test', () => {
     // E2E tests can take a while, especially with 500 images
@@ -26,12 +27,8 @@ describe('PDF Generation E2E Test', () => {
         }
 
         try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    imageBuffers: Array(500).fill(imageBuffer.toString('base64'))
-                }),
+            const response = await axios.post(API_URL, {
+                imageBuffers: Array(500).fill(imageBuffer.toString('base64'))
             });
 
             const endTime = Date.now();
@@ -39,7 +36,7 @@ describe('PDF Generation E2E Test', () => {
 
             expect(response.status).toBe(200);
 
-            const result = await response.json();
+            const result = response.data;
             expect(result).toBeDefined();
             expect(result.pdfUrl).toBeDefined();
             expect(result.executionTime).toBeDefined();

@@ -15,14 +15,9 @@ export async function POST(req: Request) {
         const buffers = imageBuffers ? imageBuffers.map((b: string) => Buffer.from(b, 'base64')) : undefined;
 
         const result = await generatePdf({ imageUrls, imageBuffers: buffers });
-
-        // Cleanup: Delete images from bucket after success if they were temporary
-        // Since we are now using client-side uploads, we might want to keep them 
-        // or have a different cleanup strategy. For now, I'll keep the logic if they are temp.
         if (result && imageUrls) {
             await Promise.all(
                 imageUrls.map(async (url: string) => {
-                    // Only cleanup if they are in our bucket and seem temporary
                     if (url.includes(process.env.SUPABASE_BUCKET_NAME || '')) {
                         const parts = url.split('/');
                         const fileName = parts[parts.length - 1];
