@@ -1,6 +1,9 @@
 import puppeteer from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { storageService } from './cloud-storage-service';
 import dotenv from 'dotenv';
+import sharp from 'sharp';
 
 dotenv.config();
 
@@ -15,42 +18,76 @@ export interface GeneratePdfResult {
     executionTime: string;
 }
 
+async function optimizeImage(buffer: Buffer): Promise<Buffer> {
+    return sharp(buffer)
+        .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+}
+
 export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().toString() }: GeneratePdfOptions): Promise<GeneratePdfResult | void> {
-    console.log('[generatePdf]: ', { imageBuffers }, { imageUrls }, { jobId });
+    console.log('[generatePdf]: ', { imageBuffersCount: imageBuffers?.length, imageUrlsCount: imageUrls?.length, jobId });
     const startTime = Date.now();
-    console.log(`Generating PDF for job ${jobId}...`);
 
     try {
-        const browser = await puppeteer.launch({
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
-        const page = await browser.newPage();
-
-        let imagesHtml = '';
+        // Optimize all images in parallel
+        const optimizedImageBase64s: string[] = [];
 
         if (imageBuffers && imageBuffers.length > 0) {
-            imagesHtml += imageBuffers.map((buffer) => {
-                const base64 = buffer.toString('base64');
-                return `<img src="data:image/png;base64,${base64}" />`;
-            }).join('');
+            const optimizedBuffers = await Promise.all(
+                imageBuffers.map(buffer => optimizeImage(buffer))
+            );
+            optimizedImageBase64s.push(...optimizedBuffers.map(b => b.toString('base64')));
         }
 
         if (imageUrls && imageUrls.length > 0) {
-            imagesHtml += imageUrls.map((url) => {
-                return `<img src="${url}" />`;
-            }).join('');
+            const fetchedAndOptimized = await Promise.all(
+                imageUrls.map(async (url) => {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error(`Failed to fetch image: ${url}`);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const optimized = await optimizeImage(Buffer.from(arrayBuffer));
+                        return optimized.toString('base64');
+                    } catch (err) {
+                        console.error(`Error processing image ${url}:`, err);
+                        return null;
+                    }
+                })
+            );
+            optimizedImageBase64s.push(...fetchedAndOptimized.filter((b): b is string => b !== null));
         }
 
-        if (!imagesHtml) {
-            throw new Error('No images provided for PDF generation');
+        if (optimizedImageBase64s.length === 0) {
+            throw new Error('No images could be processed for PDF generation');
         }
+
+        const imagesHtml = optimizedImageBase64s
+            .map(base64 => `<img src="data:image/jpeg;base64,${base64}" alt="Imagem do relatório" style="width: 100%; height: auto;"/>`)
+            .join('');
+
+        let browser;
+
+        if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+            browser = await puppeteerCore.launch({
+                args: chromium.args,
+                executablePath: await chromium.executablePath(),
+                headless: true,
+            });
+        } else {
+            browser = await puppeteer.launch({
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            });
+        }
+
+        const page = await browser.newPage();
 
         const htmlContent = `
       <html>
         <head>
           <style>
-            body { font-family: sans-serif; padding: 20px; }
-            img { max-width: 100%; margin-bottom: 20px; display: block; page-break-inside: avoid; }
+            body { font-family: sans-serif; padding: 20px; background: white; }
+            img { max-width: 100%; height: auto; margin-bottom: 20px; display: block; page-break-inside: avoid; }
             h1 { color: #333; }
           </style>
         </head>
@@ -58,18 +95,24 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
           <h1>Relatório de Imagens</h1>
           <p>Início do relatório</p>
           <p>Gerado em: ${new Date().toISOString()}</p>
-          <p>Quantidade de imagens: ${imageBuffers?.length || imageUrls?.length}</p>
+          <p>Quantidade de imagens: ${optimizedImageBase64s.length}</p>
           <p>Request ID: ${jobId}</p>
-          <p> Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.</p>
-          ${imagesHtml}
-          <p> Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.</p>
+          <p>Este relatório foi otimizado para reduzir o consumo de armazenamento.</p>
+          <div style="page-break-after: always;"></div>
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            ${imagesHtml}
+          </div>
           <p>Fim do relatório</p>
         </body>
       </html>
     `;
 
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({ format: 'A4' });
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
+        });
 
         await browser.close();
 

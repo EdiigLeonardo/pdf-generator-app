@@ -2,40 +2,35 @@ import { NextResponse } from 'next/server';
 import { generatePdf } from '@/lib/pdf-service';
 import { storageService } from '@/lib/cloud-storage-service';
 
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
     try {
-        const formData = await req.formData();
-        const files = formData.getAll('images') as File[];
+        const { imageUrls, imageBuffers } = await req.json();
 
-        if (!files || files.length === 0) {
-            return NextResponse.json({ error: 'No images uploaded' }, { status: 400 });
+        if ((!imageUrls || imageUrls.length === 0) && (!imageBuffers || imageBuffers.length === 0)) {
+            return NextResponse.json({ error: 'No images provided' }, { status: 400 });
         }
 
-        console.log('[POST] files', { files });
+        const buffers = imageBuffers ? imageBuffers.map((b: string) => Buffer.from(b, 'base64')) : undefined;
 
-        const imageUrls = await Promise.all(
-            files.map(async (file, index) => {
-                const arrayBuffer = await file.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                const fileName = `img-${Date.now()}-${index}-${file.name}`;
-                return await storageService.upload(buffer, fileName, file.type);
-            })
-        );
+        const result = await generatePdf({ imageUrls, imageBuffers: buffers });
 
-        const result = await generatePdf({ imageUrls });
-
-        // Cleanup: Delete images from bucket after success
-        if (result) {
+        // Cleanup: Delete images from bucket after success if they were temporary
+        // Since we are now using client-side uploads, we might want to keep them 
+        // or have a different cleanup strategy. For now, I'll keep the logic if they are temp.
+        if (result && imageUrls) {
             await Promise.all(
-                imageUrls.map(async (url) => {
-                    // Extract fileName from URL
-                    // Standard Supabase public URL: .../public/[bucket]/[fileName]
-                    const parts = url.split('/');
-                    const fileName = parts[parts.length - 1];
-                    try {
-                        await storageService.deleteFile(fileName);
-                    } catch (err) {
-                        console.error(`Failed to delete file ${fileName}:`, err);
+                imageUrls.map(async (url: string) => {
+                    // Only cleanup if they are in our bucket and seem temporary
+                    if (url.includes(process.env.SUPABASE_BUCKET_NAME || '')) {
+                        const parts = url.split('/');
+                        const fileName = parts[parts.length - 1];
+                        try {
+                            await storageService.deleteFile(fileName);
+                        } catch (err) {
+                            console.error(`Failed to delete file ${fileName}:`, err);
+                        }
                     }
                 })
             );

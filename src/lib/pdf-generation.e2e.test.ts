@@ -25,17 +25,13 @@ describe('PDF Generation E2E Test', () => {
             );
         }
 
-        const formData = new FormData();
-        for (let i = 0; i < 500; i++) {
-            // We append the same image 500 times
-            const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' });
-            formData.append('images', blob, `test-image-${i}.png`);
-        }
-
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
-                body: formData,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageBuffers: Array(500).fill(imageBuffer.toString('base64'))
+                }),
             });
 
             const endTime = Date.now();

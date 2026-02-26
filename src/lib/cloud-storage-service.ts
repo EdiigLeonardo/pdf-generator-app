@@ -205,6 +205,15 @@ export class StorageService {
     async listFiles(prefix?: string): Promise<string[]> {
         return this.provider.list(prefix);
     }
+
+    async deleteAllFiles(prefix?: string): Promise<void> {
+        const files = await this.listFiles(prefix);
+        if (files.length === 0) return;
+
+        console.log(`Deleting ${files.length} files...`);
+        await Promise.all(files.map(file => this.deleteFile(file)));
+        console.log('Successfully cleared the bucket.');
+    }
 }
 
 export const storageService = new StorageService();

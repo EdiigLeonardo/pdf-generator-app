@@ -35,7 +35,6 @@ export default function Home() {
     };
 
     const startJob = async () => {
-        console.log('[startJob] selectedFiles', { selectedFiles });
         if (selectedFiles.length === 0) {
             toast.error("Por favor, selecione pelo menos uma imagem.");
             return;
@@ -46,21 +45,49 @@ export default function Home() {
         setProgress(0);
         setStatus(Status.UPLOADING);
 
+        const totalChunks = selectedFiles.length + 1; // +1 for PDF generation itself
+        let completedChunks = 0;
+
         try {
-            const formData = new FormData();
-            selectedFiles.forEach((file) => {
-                console.log('[startJob] file', { file });
-                formData.append('images', file);
-            });
+            const imageUrls = await Promise.all(
+                selectedFiles.map(async (file, index) => {
+                    const fileName = `img-${Date.now()}-${index}-${file.name.replace(/\s+/g, '_')}`;
+                    const urlRes = await fetch('/api/upload-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileName, contentType: file.type })
+                    });
+
+                    if (!urlRes.ok) throw new Error(`Erro ao obter URL de upload para ${file.name}`);
+
+                    const { uploadUrl, publicUrl } = await urlRes.json();
+
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: 'PUT',
+                        body: file,
+                        headers: { 'Content-Type': file.type }
+                    });
+
+                    if (!uploadRes.ok) throw new Error(`Erro ao carregar ${file.name}`);
+
+                    completedChunks++;
+                    setProgress(Math.round((completedChunks / totalChunks) * 100));
+
+                    return publicUrl;
+                })
+            );
+
+            setStatus(Status.PROCESSING);
 
             const res = await fetch('/api/jobs', {
                 method: 'POST',
-                body: formData,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageUrls }),
             });
             const data = await res.json();
-            console.log('[startJob] data', { data });
 
             if (res.ok) {
+                setProgress(100);
                 setResult(data);
                 setStatus(Status.SUCCESS);
                 toast.success("PDF gerado com sucesso.");
@@ -68,17 +95,52 @@ export default function Home() {
                 setStatus(Status.ERROR);
                 toast.error(data.error || "Erro ao gerar PDF.");
             }
-        } catch {
+        } catch (error) {
+            console.error('[startJob] error', error);
             setStatus(Status.ERROR);
-            toast.error("Não foi possível processar o pedido.");
+            const message = error instanceof Error ? error.message : "Não foi possível processar o pedido.";
+            toast.error(message);
         } finally {
-
             setLoading(false);
-
         }
     };
 
 
+
+    const handleDownload = async () => {
+        if (!result) return;
+
+        try {
+            // 1. Fetch the file to ensure we have it before deleting
+            const response = await fetch(result.pdfUrl);
+            const blob = await response.blob();
+
+            // 2. Trigger browser download
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Relatório-Final-${new Date().getTime()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            // 3. Request cleanup from server
+            await fetch('/api/cleanup-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: result.pdfUrl })
+            });
+
+            toast.info("O PDF foi removido do servidor por segurança.");
+            setResult(null); // Clear result as it's no longer available
+            setStatus(Status.START);
+            setSelectedFiles([]);
+        } catch (error) {
+            console.error('Download/Cleanup Error:', error);
+            toast.error("Erro ao processar o download ou limpeza.");
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 font-sans">
@@ -188,8 +250,8 @@ export default function Home() {
                                         <p className="text-xs text-slate-400">Tempo de execução: {result.executionTime}</p>
                                     </div>
                                 </div>
-                                <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
-                                    <a href={result.pdfUrl} target="_blank" rel="noopener noreferrer">Download</a>
+                                <Button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-700">
+                                    Download
                                 </Button>
                             </div>
                         </CardContent>
