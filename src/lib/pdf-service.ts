@@ -99,17 +99,21 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
         let browser;
 
         console.log(`[generatePdf] Launching browser (Mode: ${process.env.NODE_ENV})...`);
-        if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+        if (process.env.NODE_ENV === 'production' || process.env.VERCEL || process.env.NETLIFY) {
+            const executablePath = await chromium.executablePath(
+                'https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar'
+            );
+
             browser = await puppeteerCore.launch({
                 args: chromium.args,
-                executablePath: await chromium.executablePath(),
+                executablePath,
                 headless: true,
             });
         } else {
+            // Local development
             browser = await puppeteer.launch({
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
                 headless: true,
-                executablePath: await chromium.executablePath(),
             });
         }
 

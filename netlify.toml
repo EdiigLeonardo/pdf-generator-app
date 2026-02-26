@@ -1,9 +1,7 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@sparticuz/chromium"]
-  included_files = ["node_modules/@sparticuz/chromium/bin/**"]
 
 [build]
   command = "npm run build"
-  functions = "dist/apps/pdf-generator-api/server/functions"
-  publish = ".next" 
+  publish = ".next"
