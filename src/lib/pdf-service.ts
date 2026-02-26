@@ -107,13 +107,7 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
         console.log(`[generatePdf] Launching browser (Mode: ${process.env.NODE_ENV})...`);
         if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
             browser = await puppeteerCore.launch({
-                args: [
-                    ...chromium.args,
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                ],
+                args: chromium.args,
                 executablePath: await chromium.executablePath(),
                 headless: true,
             });
