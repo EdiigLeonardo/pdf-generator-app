@@ -59,10 +59,10 @@ export default function Home() {
         let completedChunks = 0;
 
         try {
+            toast.info("Processando PDF...");
             const imageUrls = await Promise.all(
                 selectedFiles.map(async (file, index) => {
                     const fileName = `img-${Date.now()}-${index}-${file.name.replace(/\s+/g, '_')}`;
-                    toast.info("Processando PDF...");
                     const { data: urlData } = await axios.post('/api/upload-url', {
                         fileName,
                         contentType: file.type
