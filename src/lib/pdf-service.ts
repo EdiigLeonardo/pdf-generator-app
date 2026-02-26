@@ -115,6 +115,7 @@ export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().
             browser = await puppeteer.launch({
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
                 headless: true,
+                executablePath: await chromium.executablePath(),
             });
         }
 

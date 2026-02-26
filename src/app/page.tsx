@@ -100,6 +100,11 @@ export default function Home() {
             setStatus(Status.ERROR);
             const message = error instanceof Error ? error.message : "Não foi possível processar o pedido.";
             toast.error(message);
+
+            // Emergency cleanup: delete all images if the flow failed
+            fetch('/api/emergency-cleanup', { method: 'POST' }).catch(err =>
+                console.error('Failed to trigger emergency cleanup:', err)
+            );
         } finally {
             setLoading(false);
         }
