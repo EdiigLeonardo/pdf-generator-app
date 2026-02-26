@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, FileText, Timer } from "lucide-react";
+import { Loader2, CheckCircle2, FileText, Timer, X } from "lucide-react";
 
 
 enum Status {
@@ -37,9 +37,9 @@ export default function Home() {
 
     useEffect(() => {
         if (result) {
-            const element = document.getElementById('result-card');
+            const element = document.getElementById('root');
             if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
             }
         }
     }, [result]);
@@ -62,7 +62,7 @@ export default function Home() {
             const imageUrls = await Promise.all(
                 selectedFiles.map(async (file, index) => {
                     const fileName = `img-${Date.now()}-${index}-${file.name.replace(/\s+/g, '_')}`;
-
+                    toast.info("Processando PDF...");
                     const { data: urlData } = await axios.post('/api/upload-url', {
                         fileName,
                         contentType: file.type
@@ -116,59 +116,70 @@ export default function Home() {
         if (!result) return;
 
         try {
-            const { data: blob } = await axios.get(result.pdfUrl, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Relatório-Final-${new Date().getTime()}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            try {
+                const { data: blob } = await axios.get(result.pdfUrl, { responseType: 'blob' });
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Relatório-Final-${new Date().getTime()}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            } catch (downloadErr) {
+                console.error('Download Error (likely CORS):', downloadErr);
+                toast.warning("Erro ao descarregar com nome personalizado. A abrir link direto...");
+                window.open(result.pdfUrl, '_blank');
+            }
 
-            await axios.post('/api/cleanup-pdf', { url: result.pdfUrl });
+            try {
+                await axios.post('/api/cleanup-pdf', { url: result.pdfUrl });
+                toast.info("O PDF foi removido do servidor por segurança.");
+            } catch (cleanupErr) {
+                console.error('Cleanup Error:', cleanupErr);
+                toast.warning("O PDF foi descarregado, mas a limpeza automática falhou.");
+            }
 
-            toast.info("O PDF foi removido do servidor por segurança.");
             setResult(null);
             setStatus(Status.START);
             setSelectedFiles([]);
         } catch (error) {
-            console.error('Download/Cleanup Error:', error);
-            toast.error("Erro ao processar o download ou limpeza.");
+            console.error('General Error in downloadResult:', error);
+            toast.error("Ocorreu um erro inesperado.");
         }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 font-sans">
+        <div className="min-h-screen bg-white text-slate-900 p-8 font-sans" id="root">
             <main className="max-w-2xl mx-auto space-y-8">
                 <header className="text-center space-y-2">
-                    <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                    <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-emerald-600">
                         PDF Generator Pro
                     </h1>
-                    <p className="text-slate-400">Gere PDFs profissionais a partir de imagens em segundos.</p>
+                    <p className="text-slate-500">Gere PDFs profissionais a partir de imagens em segundos.</p>
                 </header>
 
-                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm shadow-xl">
+                <Card className="bg-white border-slate-200 shadow-xl">
                     <CardHeader>
-                        <CardTitle className="text-white">Imagens para o PDF</CardTitle>
-                        <CardDescription className="text-slate-400">Selecione as fotos que deseja incluir no documento.</CardDescription>
+                        <CardTitle className="text-slate-900">Imagens para o PDF</CardTitle>
+                        <CardDescription className="text-slate-500">Selecione as fotos que deseja incluir no documento.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-4">
                             {selectedFiles.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-3 bg-slate-900/50 border border-slate-700 rounded-lg group">
+                                <div key={index} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg group">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <FileText className="h-5 w-5 text-blue-400 shrink-0" />
-                                        <span className="text-sm truncate text-slate-200">{file.name}</span>
-                                        <span className="text-xs text-slate-500 shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                                        <span className="text-primary text-sm truncate">{file.name}</span>
+                                        <span className="text-primary text-xs text-slate-500 shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
                                     </div>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => removeFile(index)}
-                                        className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-400/10"
+                                        className="h-8 w-8 text-primary hover:text-red-500 hover:bg-red-50"
                                     >
-                                        <Loader2 className="h-4 w-4 rotate-45" /> {/* Using Loader2 as a temporary X since I don't see X in imports */}
+                                        <X className="h-4 w-4" />
                                     </Button>
                                 </div>
                             ))}
@@ -185,21 +196,22 @@ export default function Home() {
                             />
                             <label
                                 htmlFor="file-upload"
-                                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-700 rounded-xl bg-slate-900/30 hover:bg-slate-900/50 hover:border-blue-500/50 transition-all cursor-pointer group"
+                                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 hover:bg-slate-100 hover:border-blue-400 transition-all cursor-pointer group"
                             >
                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <FileText className="h-10 w-10 text-slate-500 group-hover:text-blue-400 transition-colors mb-2" />
-                                    <p className="text-sm text-slate-400 group-hover:text-slate-300">Clique para selecionar ou arraste fotos</p>
-                                    <p className="text-xs text-slate-500 mt-1">PNG, JPG, WEBP</p>
+                                    <FileText className="h-10 w-10 text-slate-400 group-hover:text-blue-500 transition-colors mb-2" />
+                                    <p className="text-sm text-slate-500 group-hover:text-slate-600">Clique para selecionar ou arraste fotos</p>
+                                    <p className="text-xs text-slate-400 mt-1">PNG, JPG, WEBP</p>
                                 </div>
                             </label>
                         </div>
                     </CardContent>
                     <CardFooter>
                         <Button
+                            variant="secondary"
                             onClick={startJob}
                             disabled={loading || selectedFiles.length === 0}
-                            className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white transition-all duration-300"
+                            className="w-full bg-primary hover:bg-primary/70 text-white transition-all duration-300"
                         >
                             {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : 'Gerar PDF'}
                         </Button>
@@ -207,46 +219,46 @@ export default function Home() {
                 </Card>
 
                 {loading && !result && (
-                    <Card className="bg-slate-800/50 border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <Card className="bg-blue-50/50 border-blue-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <CardContent className="pt-6 space-y-4">
                             <div className="flex justify-between items-center text-sm font-medium">
-                                <span className="text-slate-300 flex items-center gap-2">
+                                <span className="text-slate-600 flex items-center gap-2">
                                     <span className="relative flex h-3 w-3">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
                                     </span>
                                     Status: {status === Status.UPLOADING ? 'Processando Imagens...' : status === Status.PROCESSING ? 'Aguardando na fila...' : status}
                                 </span>
-                                <span className="text-blue-400">{progress}%</span>
+                                <span className="text-blue-600">{progress}%</span>
                             </div>
-                            <Progress value={progress} className="h-2 bg-slate-700" />
+                            <Progress value={progress} className="h-2 bg-slate-200" />
                         </CardContent>
                     </Card>
                 )}
 
                 {result && (
-                    <Card className="bg-emerald-900/20 border-emerald-500/50 animate-in zoom-in-95 duration-500" id='result-card'>
+                    <Card className="bg-emerald-50/50 border-emerald-100 animate-in zoom-in-95 duration-500" id='result-card'>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <div className="space-y-1">
-                                <CardTitle className="text-emerald-400 flex items-center gap-2">
+                                <CardTitle className="text-emerald-700 flex items-center gap-2">
                                     <CheckCircle2 className="h-5 w-5" /> Concluído
                                 </CardTitle>
-                                <CardDescription className="text-emerald-300/70">Seu documento está pronto!</CardDescription>
+                                <CardDescription className="text-emerald-600/70">Seu documento está pronto!</CardDescription>
                             </div>
-                            <Timer className="h-8 w-8 text-emerald-500 opacity-50" />
+                            <Timer className="h-8 w-8 text-emerald-600 opacity-50" />
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-lg border border-slate-700">
+                            <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-emerald-100 shadow-sm">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-500/10 rounded-md">
-                                        <FileText className="h-6 w-6 text-emerald-500" />
+                                    <div className="p-2 bg-emerald-100 rounded-md">
+                                        <FileText className="h-6 w-6 text-emerald-600" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-white">Relatório Final.pdf</p>
-                                        <p className="text-xs text-slate-400">Tempo de execução: {result.executionTime}</p>
+                                        <p className="text-sm font-medium text-slate-900">Relatório Final.pdf</p>
+                                        <p className="text-xs text-slate-500">Tempo de execução: {result.executionTime}</p>
                                     </div>
                                 </div>
-                                <Button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-700">
+                                <Button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
                                     Download
                                 </Button>
                             </div>
