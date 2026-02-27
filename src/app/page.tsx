@@ -161,7 +161,7 @@ export default function Home() {
         <div className="min-h-screen bg-white text-slate-900 p-8 font-sans" id="root">
             <main className="max-w-2xl mx-auto space-y-8">
                 <header className="text-center space-y-2">
-                    <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-emerald-600">
+                    <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl text-slate-900">
                         PDF Generator Pro
                     </h1>
                     <p className="text-slate-500">Gere PDFs profissionais a partir de imagens em segundos.</p>
