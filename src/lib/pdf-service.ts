@@ -36,39 +36,48 @@ function getFileNameFromUrl(url: string): string | null {
     }
 }
 
+async function batchProcess<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(fn));
+        results.push(...batchResults);
+    }
+    return results;
+}
+
 export async function generatePdf({ imageBuffers, imageUrls, jobId = Date.now().toString() }: GeneratePdfOptions): Promise<GeneratePdfResult | void> {
     console.log('[generatePdf]: ', { imageBuffersCount: imageBuffers?.length, imageUrlsCount: imageUrls?.length, jobId });
     const startTime = Date.now();
+    const BATCH_SIZE = 20;
 
     try {
         const optimizedBuffers: Buffer[] = [];
 
         if (imageBuffers && imageBuffers.length > 0) {
-            const optimized = await Promise.all(
-                imageBuffers.map(buffer => optimizeImage(buffer))
-            );
+            console.log(`[generatePdf] Optimizing ${imageBuffers.length} buffers in batches of ${BATCH_SIZE}...`);
+            const optimized = await batchProcess(imageBuffers, BATCH_SIZE, optimizeImage);
             optimizedBuffers.push(...optimized);
         }
 
         if (imageUrls && imageUrls.length > 0) {
-            const fetchedAndOptimized = await Promise.all(
-                imageUrls.map(async (url) => {
-                    try {
-                        let buffer: Buffer;
-                        const fileName = getFileNameFromUrl(url);
-                        if (fileName && fileName.startsWith('img-')) {
-                            buffer = await storageService.readFile(fileName);
-                        } else {
-                            const { data: arrayBuffer } = await axios.get(url, { responseType: 'arraybuffer' });
-                            buffer = Buffer.from(arrayBuffer);
-                        }
-                        return await optimizeImage(buffer);
-                    } catch (err) {
-                        console.error(`[generatePdf] Error processing image ${url}:`, err);
-                        return null;
+            console.log(`[generatePdf] Fetching and optimizing ${imageUrls.length} URLs in batches of ${BATCH_SIZE}...`);
+            const fetchedAndOptimized = await batchProcess(imageUrls, BATCH_SIZE, async (url) => {
+                try {
+                    let buffer: Buffer;
+                    const fileName = getFileNameFromUrl(url);
+                    if (fileName && fileName.startsWith('img-')) {
+                        buffer = await storageService.readFile(fileName);
+                    } else {
+                        const { data: arrayBuffer } = await axios.get(url, { responseType: 'arraybuffer' });
+                        buffer = Buffer.from(arrayBuffer);
                     }
-                })
-            );
+                    return await optimizeImage(buffer);
+                } catch (err) {
+                    console.error(`[generatePdf] Error processing image ${url}:`, err);
+                    return null;
+                }
+            });
             optimizedBuffers.push(...fetchedAndOptimized.filter((b): b is Buffer => b !== null));
         }
 

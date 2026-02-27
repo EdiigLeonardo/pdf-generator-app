@@ -8,6 +8,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, FileText, Timer, X } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 
 enum Status {
@@ -218,53 +226,70 @@ export default function Home() {
                     </CardFooter>
                 </Card>
 
-                {loading && !result && (
-                    <Card className="bg-blue-50/50 border-blue-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <CardContent className="pt-6 space-y-4">
-                            <div className="flex justify-between items-center text-sm font-medium">
-                                <span className="text-slate-600 flex items-center gap-2">
-                                    <span className="relative flex h-3 w-3">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
-                                    </span>
-                                    Status: {status === Status.UPLOADING ? 'Processando Imagens...' : status === Status.PROCESSING ? 'Aguardando na fila...' : status}
-                                </span>
-                                <span className="text-blue-600">{progress}%</span>
-                            </div>
-                            <Progress value={progress} className="h-2 bg-slate-200" />
-                        </CardContent>
-                    </Card>
-                )}
-
-                {result && (
-                    <Card className="bg-emerald-50/50 border-emerald-100 animate-in zoom-in-95 duration-500" id='result-card'>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <div className="space-y-1">
-                                <CardTitle className="text-emerald-700 flex items-center gap-2">
-                                    <CheckCircle2 className="h-5 w-5" /> Concluído
-                                </CardTitle>
-                                <CardDescription className="text-emerald-600/70">Seu documento está pronto!</CardDescription>
-                            </div>
-                            <Timer className="h-8 w-8 text-emerald-600 opacity-50" />
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-emerald-100 shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-100 rounded-md">
-                                        <FileText className="h-6 w-6 text-emerald-600" />
+                <Dialog open={loading || !!result} onOpenChange={(open) => {
+                    if (!open && !loading) setResult(null);
+                }}>
+                    <DialogContent className="sm:max-w-md bg-white border-blue-100">
+                        {loading && !result ? (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle className="text-blue-700 flex items-center gap-2 text-2xl">
+                                        <Loader2 className="h-6 w-6 animate-spin" /> Processando
+                                    </DialogTitle>
+                                    <DialogDescription className="text-slate-500 text-base">
+                                        Estamos a preparar o seu documento. Por favor, aguarde um momento.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-6">
+                                    <div className="flex justify-between items-center text-sm font-medium">
+                                        <span className="text-slate-600">
+                                            Status: {status === Status.UPLOADING ? 'A preparar imagens...' : 'A gerar PDF...'}
+                                        </span>
+                                        <span className="text-blue-600">{progress}%</span>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900">Relatório Final.pdf</p>
-                                        <p className="text-xs text-slate-500">Tempo de execução: {result.executionTime}</p>
+                                    <Progress value={progress} className="h-2 bg-blue-50" />
+                                </div>
+                            </>
+                        ) : result ? (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle className="text-emerald-700 flex items-center gap-2 text-2xl">
+                                        <CheckCircle2 className="h-6 w-6" /> Concluído
+                                    </DialogTitle>
+                                    <DialogDescription className="text-slate-500 text-base">
+                                        O seu documento foi gerado com sucesso e está pronto para download.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-6 py-4">
+                                    <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-white rounded-lg shadow-sm">
+                                                <FileText className="h-8 w-8 text-emerald-600" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-semibold text-slate-900">Relatório Final.pdf</p>
+                                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                    <Timer className="h-3 w-3" />
+                                                    <span>Tempo: {result?.executionTime}</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <Button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
-                                    Download
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+
+                                <DialogFooter className="sm:justify-start gap-3">
+                                    <Button
+                                        onClick={handleDownload}
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg py-6 text-lg font-semibold transition-all hover:scale-[1.02]"
+                                    >
+                                        <FileText className="mr-2 h-5 w-5" /> Descarregar PDF
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        ) : null}
+                    </DialogContent>
+                </Dialog>
             </main>
         </div>
     );
