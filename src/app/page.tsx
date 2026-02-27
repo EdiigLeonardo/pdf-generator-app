@@ -173,24 +173,26 @@ export default function Home() {
                         <CardDescription className="text-slate-500">Selecione as fotos que deseja incluir no documento.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid gap-4">
-                            {selectedFiles.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg group">
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <FileText className="h-5 w-5 text-blue-400 shrink-0" />
-                                        <span className="text-primary text-sm truncate">{file.name}</span>
-                                        <span className="text-primary text-xs text-slate-500 shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                        <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="grid gap-4">
+                                {selectedFiles.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg group">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <FileText className="h-5 w-5 text-blue-400 shrink-0" />
+                                            <span className="text-primary text-sm truncate">{file.name}</span>
+                                            <span className="text-primary text-xs text-slate-500 shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeFile(index)}
+                                            className="h-8 w-8 text-primary hover:text-red-500 hover:bg-red-50"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeFile(index)}
-                                        className="h-8 w-8 text-primary hover:text-red-500 hover:bg-red-50"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
 
                         <div className="relative group">
